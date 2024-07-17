@@ -15,15 +15,33 @@ jobs:
     runs-on: ubuntu-latest
     name: Push Docker image to Docker Hub
     steps:
+      - name: Clean runner
+        run: |
+          docker builder prune -f
+          docker system prune -a -f
+          rm -rf /usr/share/dotnet
+          rm -rf /opt/ghc
+          rm -rf "/usr/local/share/boost"
+          rm -rf "$AGENT_TOOLSDIRECTORY"
+
       - name: Check out the repo
         uses: actions/checkout@v3
+
+      - name: Add hosts to /etc/hosts
+        env:
+          super_secret: ${{ secrets.REGISTRY_HOSTIP}}
+        if: ${{ env.super_secret != '' }}
+        run: |
+          echo "${{ secrets.REGISTRY_HOSTIP}} ${{ secrets.REGISTRY_HOSTNAME}}" | sudo tee -a /etc/hosts
+          cat /etc/hosts
 
       - name: Log in to Docker Hub
         if: github.event_name == 'release'
         uses: docker/login-action@v2
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+          registry: ${{ secrets.REGISTRY_HOSTNAME || 'docker.io' }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
 
       - name: Docker meta
         id: meta
@@ -31,7 +49,7 @@ jobs:
         with:
           # list of Docker images to use as base name for tags
           images: |
-            ${{ github.event_name == 'pull_request' && github.event.pull_request.user.login || secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKERHUB_REPONAME }}
+            ${{ secrets.REGISTRY_HOSTNAME || 'docker.io' }}/${{ github.event_name == 'pull_request' && github.event.pull_request.user.login || secrets.REGISTRY_USERNAME }}/${{ secrets.REGISTRY_REPONAME || github.event.repository.name }}
           flavor: |
             latest=auto
           # generate Docker tags based on the following events/attributes
@@ -42,6 +60,7 @@ jobs:
       - name: Push to Docker Hub
         uses: docker/build-push-action@v4
         with:
+          context: .
           push: ${{ github.event_name == 'release' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
