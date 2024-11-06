@@ -1,4 +1,4 @@
-FROM pytorch/pytorch:2.3.1-cuda11.8-cudnn8-devel
+FROM chaoxu98/one2345:1.0
 
 RUN apt-get update && apt-get install -y libgl1-mesa-glx libpci-dev curl nano psmisc zip git && apt-get --fix-broken install -y
 
